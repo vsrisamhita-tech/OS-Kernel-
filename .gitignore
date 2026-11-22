@@ -1,0 +1,22 @@
+# Git ignore for CYBERLAB OS
+# Operating system build artifacts
+micro-os/build/*
+micro-os/*.iso
+micro-os/*.img
+# VirtualBox images
+*.vdi
+*.vbox
+*.vbox-prev
+# Rust build artifacts
+rustos/target/
+# Python bytecode
+__pycache__/
+*.pyc
+# Logs and cache
+*.log
+*.cache
+# Temporary files
+/tmp/*
+# Large binaries
+*.zip
+*.tar.gz
