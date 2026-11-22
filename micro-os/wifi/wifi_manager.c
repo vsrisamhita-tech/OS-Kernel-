@@ -22,14 +22,14 @@ bool detect_virtualbox_environment() {
     char buf[128] = {0};
     if (fgets(buf, sizeof(buf), fp)) {
         pclose(fp);
-        if (strstr(buf, "oracle") || strstr(buf, "VirtualBox") || strstr(buf, "vbox")) {
+        if (strstr(buf, "oracle") || strstr(buf, "VirtualBox") || strstr(buf, "vbox") || strstr(buf, "innotek")) {
             return true;
         }
     } else {
         pclose(fp);
     }
-    // Also check if eth0 is default route
-    FILE *fp2 = popen("ip route | grep default | grep eth0 2>/dev/null", "r");
+    // Also check default route for eth0
+    FILE *fp2 = popen("ip route 2>/dev/null | grep -E 'default|eth0'", "r");
     if (fp2) {
         if (fgets(buf, sizeof(buf), fp2)) {
             pclose(fp2);
@@ -41,9 +41,9 @@ bool detect_virtualbox_environment() {
 }
 
 bool is_wifi_hardware_present() {
-    FILE *fp = popen("nmcli -t -f TYPE device 2>/dev/null | grep -i wifi", "r");
+    FILE *fp = popen("nmcli -t -f TYPE device 2>/dev/null | grep -i wifi || iw dev 2>/dev/null | grep Interface", "r");
     if (!fp) return false;
-    char buf[32];
+    char buf[64];
     bool found = (fgets(buf, sizeof(buf), fp) != NULL);
     pclose(fp);
     return found;
@@ -51,14 +51,12 @@ bool is_wifi_hardware_present() {
 
 int scan_wifi_networks(WifiNetwork networks[], int max_nets) {
     if (!is_wifi_hardware_present()) return 0;
-    // Trigger rescan
-    system("nmcli device wifi rescan 2>/dev/null");
+    system("nmcli device wifi rescan 2>/dev/null || iwlist scan 2>/dev/null");
     FILE *fp = popen("nmcli -t -f SSID,SIGNAL,SECURITY,IN-USE device wifi list 2>/dev/null", "r");
     if (!fp) return 0;
     char line[256];
     int count = 0;
     while (fgets(line, sizeof(line), fp) && count < max_nets) {
-        // Strip newline
         line[strcspn(line, "\r\n")] = 0;
         char *token = strtok(line, ":");
         if (!token || strlen(token) == 0) continue;
@@ -82,9 +80,9 @@ int scan_wifi_networks(WifiNetwork networks[], int max_nets) {
 bool connect_wifi(const char *ssid, const char *password) {
     char cmd[512];
     if (password && strlen(password) > 0) {
-        snprintf(cmd, sizeof(cmd), "nmcli device wifi connect \"%s\" password \"%s\" 2>/dev/null", ssid, password);
+        snprintf(cmd, sizeof(cmd), "nmcli device wifi connect \"%s\" password \"%s\" 2>/dev/null || (wpa_passphrase \"%s\" \"%s\" > /tmp/wpa.conf && wpa_supplicant -B -i wlan0 -c /tmp/wpa.conf 2>/dev/null)", ssid, password, ssid, password);
     } else {
-        snprintf(cmd, sizeof(cmd), "nmcli device wifi connect \"%s\" 2>/dev/null", ssid);
+        snprintf(cmd, sizeof(cmd), "nmcli device wifi connect \"%s\" 2>/dev/null || iwconfig wlan0 essid \"%s\" 2>/dev/null", ssid, ssid);
     }
     return (system(cmd) == 0);
 }
@@ -136,16 +134,42 @@ void print_wifi_dashboard() {
 }
 
 int main(int argc, char *argv[]) {
-    if (argc > 1 && strcmp(argv[1], "--connect") == 0 && argc >= 3) {
-        const char *ssid = argv[2];
-        const char *pass = (argc >= 4) ? argv[3] : NULL;
-        printf("Connecting to Wi-Fi SSID '%s'...\n", ssid);
-        if (connect_wifi(ssid, pass)) {
-            printf("\e[1;32m[SUCCESS]\e[0m Connected to '%s'!\n", ssid);
-        } else {
-            printf("\e[1;31m[FAILED]\e[0m Authentication failed or network unreachable.\n");
+    if (argc > 1) {
+        if (strcmp(argv[1], "scan") == 0) {
+            printf("[INFO] Scanning nearby wireless networks...\n");
+            system("nmcli device wifi list 2>/dev/null || iwlist scan 2>/dev/null");
+            return 0;
+        } else if (strcmp(argv[1], "status") == 0) {
+            print_wifi_dashboard();
+            return 0;
+        } else if (strcmp(argv[1], "connect") == 0 || strcmp(argv[1], "--connect") == 0) {
+            if (argc < 3) {
+                printf("Usage: wifi connect <SSID> [password]\n");
+                return 1;
+            }
+            const char *ssid = argv[2];
+            const char *pass = (argc >= 4) ? argv[3] : NULL;
+            printf("Connecting to Wi-Fi SSID '%s'...\n", ssid);
+            if (connect_wifi(ssid, pass)) {
+                printf("\e[1;32m[SUCCESS]\e[0m Connected to '%s'!\n", ssid);
+            } else {
+                printf("\e[1;31m[FAILED]\e[0m Authentication failed or network unreachable.\n");
+            }
+            return 0;
+        } else if (strcmp(argv[1], "disconnect") == 0) {
+            printf("Disconnecting wireless connection...\n");
+            system("nmcli connection down \"$(nmcli -t -f NAME,TYPE c show --active | grep wireless | cut -d: -f1)\" 2>/dev/null || killall wpa_supplicant 2>/dev/null");
+            printf("[OK] Disconnected.\n");
+            return 0;
+        } else if (strcmp(argv[1], "help") == 0 || strcmp(argv[1], "--help") == 0) {
+            printf("CYBERLAB OS Wi-Fi Manager Commands:\n");
+            printf("  wifi                    - Display wireless dashboard and status\n");
+            printf("  wifi status             - Show current connection status & diagnostics\n");
+            printf("  wifi scan               - Scan nearby wireless access points\n");
+            printf("  wifi connect <SSID> [pw] - Connect to an access point with password\n");
+            printf("  wifi disconnect         - Disconnect from active Wi-Fi\n");
+            return 0;
         }
-        return 0;
     }
 
     print_wifi_dashboard();
