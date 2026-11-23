@@ -2,10 +2,10 @@
 set -e
 
 echo "========================================================================"
-echo "   REBUILDING OS: SLEEK WALLPAPER + SNAP STORE + PS/2 MOUSE/KEYBOARD    "
+echo "   REBUILDING OS: SMOOTH DOCK + ONE-CLICK LAUNCHERS + GLITCH-FREE UI    "
 echo "========================================================================"
 
-BUILD_DIR="/tmp/cyberlab_full_rebuild"
+BUILD_DIR="/tmp/cyberlab_smooth_build"
 ISO_OUT="/mnt/c/Users/ECS/.gemini/antigravity/scratch/CYBERLAB_OS/micro-os/build"
 SRC_DIR="/mnt/c/Users/ECS/.gemini/antigravity/scratch/CYBERLAB_OS"
 
@@ -31,7 +31,7 @@ zcat "$BUILD_DIR/iso/boot/core.gz" | cpio -idm 2>/dev/null
 echo "   Unpacked files: $(find . | wc -l)"
 
 # 4. Inject custom binaries, wallpaper, Snap Store, & dock
-echo "[4/6] Injecting Sleek Wallpaper, Snap Store, and Applications..."
+echo "[4/6] Injecting Smooth Launchers, Snap Store, & Clean UI..."
 mkdir -p "$BUILD_DIR/initrd/usr/local/bin"
 mkdir -p "$BUILD_DIR/initrd/usr/local/share/pixmaps"
 mkdir -p "$BUILD_DIR/initrd/etc/sysconfig"
@@ -58,17 +58,48 @@ ln -sf snap-store snapstore
 cd "$BUILD_DIR/initrd"
 
 # Copy new sleek wallpaper & icons
-cp "$SRC_DIR/sleek_wallpaper.png" "$BUILD_DIR/initrd/usr/local/share/pixmaps/cyberlab_wallpaper.png"
-cp "$SRC_DIR/sleek_wallpaper.png" "$BUILD_DIR/initrd/usr/local/share/pixmaps/logo.png" 2>/dev/null || true
-cp "$SRC_DIR/sleek_wallpaper.png" "$BUILD_DIR/initrd/usr/local/share/pixmaps/core.png" 2>/dev/null || true
+cp "$SRC_DIR/aurora_wallpaper.png" "$BUILD_DIR/initrd/usr/local/share/pixmaps/cyberlab_wallpaper.png"
+cp "$SRC_DIR/aurora_wallpaper.png" "$BUILD_DIR/initrd/usr/local/share/pixmaps/logo.png" 2>/dev/null || true
+cp "$SRC_DIR/aurora_wallpaper.png" "$BUILD_DIR/initrd/usr/local/share/pixmaps/core.png" 2>/dev/null || true
+cp "$SRC_DIR/term_icon.png" "$BUILD_DIR/initrd/usr/local/share/pixmaps/term_icon.png" 2>/dev/null || true
 cp "$SRC_DIR/snapstore.png" "$BUILD_DIR/initrd/usr/local/share/pixmaps/snapstore.png" 2>/dev/null || true
+cp "$SRC_DIR/wifi.png" "$BUILD_DIR/initrd/usr/local/share/pixmaps/wifi.png" 2>/dev/null || true
+cp "$SRC_DIR/deadlock.png" "$BUILD_DIR/initrd/usr/local/share/pixmaps/deadlock.png" 2>/dev/null || true
+cp "$SRC_DIR/snake.png" "$BUILD_DIR/initrd/usr/local/share/pixmaps/snake.png" 2>/dev/null || true
+
+# STANDALONE LAUNCHER WRAPPERS (Fixes wbar execvp quote parsing bug!)
+cat << 'EOF' > "$BUILD_DIR/initrd/usr/local/bin/launch-terminal"
+#!/bin/sh
+exec aterm -title "CYBERLAB OS :: Engineering Terminal" -geometry 100x32+60+40 -bg black -fg green -cr white &
+EOF
+chmod 755 "$BUILD_DIR/initrd/usr/local/bin/launch-terminal"
+
+cat << 'EOF' > "$BUILD_DIR/initrd/usr/local/bin/launch-snap"
+#!/bin/sh
+exec aterm -title "CYBERLAB OS :: Snap Store" -geometry 95x32+70+35 -bg black -fg white -cr green -e /usr/local/bin/snap-store &
+EOF
+chmod 755 "$BUILD_DIR/initrd/usr/local/bin/launch-snap"
+
+cat << 'EOF' > "$BUILD_DIR/initrd/usr/local/bin/launch-wifi"
+#!/bin/sh
+exec aterm -title "CYBERLAB OS :: Wi-Fi & Network Control Center" -geometry 88x34+80+30 -bg black -fg green -cr white -e /usr/local/bin/wifi-manager &
+EOF
+chmod 755 "$BUILD_DIR/initrd/usr/local/bin/launch-wifi"
+
+cat << 'EOF' > "$BUILD_DIR/initrd/usr/local/bin/launch-deadlock"
+#!/bin/sh
+exec aterm -title "CYBERLAB OS :: Deadlock Avoidance Research Lab" -geometry 95x35+50+30 -bg black -fg green -cr white -e /bin/sh -c "/usr/local/bin/deadlock-lab; echo ''; echo 'Press Enter to return to shell...'; read dummy; exec /bin/sh" &
+EOF
+chmod 755 "$BUILD_DIR/initrd/usr/local/bin/launch-deadlock"
+
+cat << 'EOF' > "$BUILD_DIR/initrd/usr/local/bin/launch-snake"
+#!/bin/sh
+exec aterm -title "CYBERLAB OS :: Retro Snake Arcade" -geometry 50x28+120+60 -bg black -fg green -cr white -e /usr/local/bin/snake-game &
+EOF
+chmod 755 "$BUILD_DIR/initrd/usr/local/bin/launch-snake"
 
 # Terminal launcher
-cat << 'EOF' > "$BUILD_DIR/initrd/usr/local/bin/terminal"
-#!/bin/sh
-exec aterm -title "CYBERLAB OS :: Engineering Terminal" -geometry 100x32+60+40 -bg black -fg green -cr white "$@"
-EOF
-chmod 755 "$BUILD_DIR/initrd/usr/local/bin/terminal"
+cp "$BUILD_DIR/initrd/usr/local/bin/launch-terminal" "$BUILD_DIR/initrd/usr/local/bin/terminal"
 
 # Help manual
 cat << 'HELP_EOF' > "$BUILD_DIR/initrd/usr/local/bin/help"
@@ -96,27 +127,18 @@ HELP_BANNER
 HELP_EOF
 chmod 755 "$BUILD_DIR/initrd/usr/local/bin/help"
 
-# MOTD
-cat << 'MOTD_EOF' > "$BUILD_DIR/initrd/etc/cyberlab_motd"
-
+# Setup profile
+cat << 'EOF' >> "$BUILD_DIR/initrd/etc/skel/.profile"
+clear
+cat << 'BANNER'
 ========================================================================
      CYBERLAB OS :: DUAL ARCHITECTURE ENGINEERING PLATFORM
    Paper: Safe-State Analysis: How Conservative Is Deadlock Avoidance?
    Researcher: Vuppalapati Sri Samhita (USN: 25BTRCL285, CSE-AIML-E)
 ========================================================================
-  Type 'snap'        for the Snap Store & Software Center.
-  Type 'wifi'        for the Wi-Fi Control Center & Network Status.
-  Type 'deadlock-lab' to run the research paper benchmark.
-  Type 'snake'       to play the Retro Snake Arcade Game.
-  Type 'help'        to see all commands.
+  Commands: 'snap', 'wifi', 'deadlock-lab', 'snake', 'help'
 ========================================================================
-
-MOTD_EOF
-
-# Setup profile
-cat << 'EOF' >> "$BUILD_DIR/initrd/etc/skel/.profile"
-clear
-cat /etc/cyberlab_motd
+BANNER
 export PATH=/usr/local/bin:/usr/bin:/bin:/sbin:/usr/sbin
 export PS1='cyberlab-os:\w\$ '
 alias snap="/usr/local/bin/snap-store"
@@ -152,60 +174,38 @@ cp "$BUILD_DIR/initrd/home/tc/.X.d/00-wallpaper" "$BUILD_DIR/initrd/usr/local/et
 # Autostart terminal
 cat << 'EOF' > "$BUILD_DIR/initrd/home/tc/.X.d/01-terminal"
 #!/bin/sh
-aterm -title "CYBERLAB OS :: Engineering Terminal" -geometry 100x32+60+40 -bg black -fg green -cr white &
+exec aterm -title "CYBERLAB OS :: Engineering Terminal" -geometry 100x32+60+40 -bg black -fg green -cr white &
 EOF
 chmod 755 "$BUILD_DIR/initrd/home/tc/.X.d/01-terminal"
 cp "$BUILD_DIR/initrd/home/tc/.X.d/01-terminal" "$BUILD_DIR/initrd/usr/local/etc/X.d/01-terminal"
 
-# Floating dock (.wbar) with Snap Store!
+# ROCK-SOLID GLITCH-FREE FLOATING DOCK (.wbar)
+# Direct launcher paths with no quote/parsing bugs and smooth click handling
 cat << 'EOF' > "$BUILD_DIR/initrd/home/tc/.wbar"
 i: /usr/local/share/wbar/osxbarback.png
 t: /usr/local/lib/X11/fonts/TTF/luxisr/11
-c: wbar -bpress -pos bottom -zoomf 2 -isize 36 -bdist 10
+c: wbar -bpress -pos bottom -isize 40 -bdist 12
 
-i: /usr/local/share/pixmaps/aterm.png
+i: /usr/local/share/pixmaps/term_icon.png
 t: Terminal
-c: aterm -title "CYBERLAB OS :: Engineering Terminal" -geometry 100x32+60+40 -bg black -fg green -cr white
+c: /usr/local/bin/launch-terminal
 
 i: /usr/local/share/pixmaps/snapstore.png
 t: Snap Store
-c: aterm -title "Snap Store" -geometry 90x28 -e /usr/local/bin/snap-store
+c: /usr/local/bin/launch-snap
 
-i: /usr/local/share/pixmaps/aterm.png
-t: Wi-Fi Settings
-c: aterm -title "CYBERLAB - Wi-Fi Quick Settings" -geometry 75x26 -hold -e /usr/local/bin/wifi
+i: /usr/local/share/pixmaps/wifi.png
+t: Wi-Fi Control
+c: /usr/local/bin/launch-wifi
 
-i: /usr/local/share/pixmaps/aterm.png
+i: /usr/local/share/pixmaps/deadlock.png
 t: Deadlock Lab
-c: aterm -title "CYBERLAB - Deadlock Research Lab" -geometry 95x35 -hold -e /usr/local/bin/deadlock-lab
+c: /usr/local/bin/launch-deadlock
 
-i: /usr/local/share/pixmaps/aterm.png
+i: /usr/local/share/pixmaps/snake.png
 t: Snake Arcade
-c: aterm -title "Retro Snake Arcade" -geometry 45x28 -e /usr/local/bin/snake-game
+c: /usr/local/bin/launch-snake
 EOF
-
-# Desktop entries
-cat << 'EOF' > "$BUILD_DIR/initrd/home/tc/Desktop/Snap_Store.desktop"
-[Desktop Entry]
-Name=Snap Store
-Comment=Canonical Snap Package Center
-Exec=aterm -title "Snap Store" -geometry 90x28 -e /usr/local/bin/snap-store
-Icon=snapstore
-Terminal=false
-Type=Application
-EOF
-
-cat << 'EOF' > "$BUILD_DIR/initrd/home/tc/Desktop/Terminal.desktop"
-[Desktop Entry]
-Name=CyberLab Terminal
-Comment=Engineering Console
-Exec=aterm -title "CYBERLAB OS :: Engineering Terminal" -geometry 100x32+60+40 -bg black -fg green -cr white
-Icon=aterm
-Terminal=false
-Type=Application
-EOF
-
-chmod +x "$BUILD_DIR/initrd/home/tc/Desktop/"*.desktop 2>/dev/null || true
 
 # User tc ownership
 chown -R 1001:50 "$BUILD_DIR/initrd/home/tc"
@@ -237,5 +237,5 @@ xorriso -as mkisofs -l -J -R -V "CYBERLAB_OS" -no-emul-boot -boot-load-size 4 \
 
 ls -lh "$ISO_OUT/cyberlab_microos.iso"
 echo "========================================================================"
-echo "=== BUILD COMPLETE! ISO ready with Sleek Wallpaper & Snap Store ==="
+echo "=== BUILD COMPLETE! Glitch-free Smooth Launchers Ready ==="
 echo "========================================================================"

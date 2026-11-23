@@ -6,7 +6,7 @@ ISO_OUT="/mnt/c/Users/ECS/.gemini/antigravity/scratch/CYBERLAB_OS/micro-os/build
 mkdir -p "$BUILD_DIR"
 mkdir -p "$ISO_OUT"
 
-echo "=== CYBERLAB MicroOS Bootable ISO Generator with Full Terminal Support ==="
+echo "=== CYBERLAB MicroOS Builder with Visible Interactive Terminal ==="
 
 # 1. Base ISO
 if [ ! -f /tmp/CorePlus-current.iso ]; then
@@ -27,7 +27,7 @@ mkdir -p "$BUILD_DIR/initrd"
 cd "$BUILD_DIR/initrd"
 zcat "$BUILD_DIR/iso/boot/core.gz" | cpio -idm 2>/dev/null
 
-# 4. Inject CYBERLAB OS custom binaries & desktop configuration
+# 4. Inject CYBERLAB OS custom binaries & terminal environment
 echo "[4/6] Injecting CYBERLAB OS custom binaries & terminal environment..."
 
 cp /mnt/c/Users/ECS/.gemini/antigravity/scratch/CYBERLAB_OS/research-lab/deadlock-lab "$BUILD_DIR/initrd/usr/local/bin/deadlock-lab"
@@ -35,13 +35,20 @@ cp /mnt/c/Users/ECS/.gemini/antigravity/scratch/CYBERLAB_OS/micro-os/scripts/sna
 cp /mnt/c/Users/ECS/.gemini/antigravity/scratch/CYBERLAB_OS/micro-os/wifi/wifi-manager "$BUILD_DIR/initrd/usr/local/bin/wifi-manager"
 chmod 755 "$BUILD_DIR/initrd/usr/local/bin/"*
 
-# Create symlinks using relative paths
+# Relative symlinks
 cd "$BUILD_DIR/initrd/usr/local/bin"
 ln -sf wifi-manager wifi
 ln -sf deadlock-lab deadlock
 ln -sf deadlock-lab research-lab
 ln -sf snake-game snake
 cd "$BUILD_DIR/initrd"
+
+# Create /usr/local/bin/terminal launcher
+cat << 'EOF' > "$BUILD_DIR/initrd/usr/local/bin/terminal"
+#!/bin/sh
+exec aterm -title "CYBERLAB OS :: Engineering Terminal" -geometry 100x32+60+40 -bg black -fg green -cr white "$@"
+EOF
+chmod 755 "$BUILD_DIR/initrd/usr/local/bin/terminal"
 
 # Create /usr/local/bin/help
 cat << 'EOF' > "$BUILD_DIR/initrd/usr/local/bin/help"
@@ -53,7 +60,7 @@ cat << 'HELP_BANNER'
    Paper: Safe-State Analysis: How Conservative Is Deadlock Avoidance?
    Researcher: Vuppalapati Sri Samhita (USN: 25BTRCL285, CSE-AIML-E)
 ========================================================================
-  [AVAILABLE COMMANDS]:
+  [AVAILABLE COMMANDS IN THIS TERMINAL]:
     wifi                     - Open Wi-Fi Manager & VirtualBox NAT Status
     wifi scan                - Scan surrounding 802.11 access points
     wifi status              - Show active connection diagnostics
@@ -61,6 +68,7 @@ cat << 'HELP_BANNER'
     wifi disconnect          - Disconnect from wireless network
     deadlock-lab             - Run Safe-State Research Benchmark (Tables 1-5)
     snake                    - Launch Retro Snake Arcade Game
+    terminal                 - Open another terminal window
     help                     - Display this command manual
     ifconfig / ip a          - View all active network adapter interfaces
     ping 8.8.8.8             - Test live Internet connectivity
@@ -70,9 +78,9 @@ cat << 'HELP_BANNER'
 
 HELP_BANNER
 EOF
-chmod 755 "$BUILD_DIR/initrd/usr/local/bin/"*
+chmod 755 "$BUILD_DIR/initrd/usr/local/bin/help"
 
-# Setup motd banner
+# MOTD banner
 cat << 'EOF' > "$BUILD_DIR/initrd/etc/cyberlab_motd"
 
 ========================================================================
@@ -90,8 +98,10 @@ EOF
 
 # Setup profile and ashrc
 cat << 'EOF' >> "$BUILD_DIR/initrd/etc/skel/.profile"
+clear
 cat /etc/cyberlab_motd
 export PATH=/usr/local/bin:/usr/bin:/bin:/sbin:/usr/sbin
+export PS1='cyberlab-os:\w\$ '
 alias wifi="/usr/local/bin/wifi"
 alias deadlock="/usr/local/bin/deadlock-lab"
 alias snake="/usr/local/bin/snake-game"
@@ -120,7 +130,7 @@ c: wbar -bpress -pos bottom -zoomf 2 -isize 36 -bdist 10
 
 i: /usr/local/share/pixmaps/aterm.png
 t: Terminal
-c: aterm -title "CYBERLAB OS :: Terminal Console" -geometry 105x34+60+40 -bg black -fg green -cr white -e /bin/sh -l
+c: aterm -title "CYBERLAB OS :: Engineering Terminal" -geometry 100x32+60+40 -bg black -fg green -cr white
 
 i: /usr/local/share/pixmaps/aterm.png
 t: Wi-Fi Settings
@@ -140,7 +150,7 @@ cat << 'EOF' > "$BUILD_DIR/initrd/home/tc/Desktop/Terminal.desktop"
 [Desktop Entry]
 Name=CyberLab Terminal
 Comment=Engineering Console
-Exec=aterm -title "CYBERLAB OS :: Terminal Console" -geometry 105x34+60+40 -bg black -fg green -cr white -e /bin/sh -l
+Exec=aterm -title "CYBERLAB OS :: Engineering Terminal" -geometry 100x32+60+40 -bg black -fg green -cr white
 Icon=aterm
 Terminal=false
 Type=Application
@@ -156,32 +166,12 @@ Terminal=false
 Type=Application
 EOF
 
-cat << 'EOF' > "$BUILD_DIR/initrd/home/tc/Desktop/Deadlock_Lab.desktop"
-[Desktop Entry]
-Name=Deadlock Research Lab
-Comment=Safe-State Analysis Benchmark by Vuppalapati Sri Samhita
-Exec=aterm -title "CYBERLAB - Deadlock Research Lab" -geometry 95x35 -hold -e /usr/local/bin/deadlock-lab
-Icon=aterm
-Terminal=false
-Type=Application
-EOF
-
-cat << 'EOF' > "$BUILD_DIR/initrd/home/tc/Desktop/Snake_Arcade.desktop"
-[Desktop Entry]
-Name=Retro Snake Arcade
-Comment=Classic Retro Snake Game
-Exec=aterm -title "Retro Snake Arcade" -geometry 45x28 -e /usr/local/bin/snake-game
-Icon=aterm
-Terminal=false
-Type=Application
-EOF
-
 chmod +x "$BUILD_DIR/initrd/home/tc/Desktop/"*.desktop 2>/dev/null || true
 
-# AUTOSTART TERMINAL ON DESKTOP LOAD
+# AUTOSTART INTERACTIVE TERMINAL (WITHOUT -e /bin/sh -l which caused exit)
 cat << 'EOF' > "$BUILD_DIR/initrd/home/tc/.X.d/00-terminal"
 #!/bin/sh
-aterm -title "CYBERLAB OS :: Terminal Console" -geometry 105x34+60+40 -bg black -fg green -cr white -e /bin/sh -l &
+aterm -title "CYBERLAB OS :: Engineering Terminal" -geometry 100x32+60+40 -bg black -fg green -cr white &
 EOF
 chmod +x "$BUILD_DIR/initrd/home/tc/.X.d/00-terminal"
 cp "$BUILD_DIR/initrd/home/tc/.X.d/00-terminal" "$BUILD_DIR/initrd/usr/local/etc/X.d/00-terminal"

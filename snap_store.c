@@ -1,7 +1,6 @@
 /*
  * SNAP STORE - Canonical Snap Package Manager for MicroOS
- * File: snap_store.c
- * Interactive CLI / TUI Package Manager & Software Center
+ * Clean ASCII terminal UI (No Unicode / emoji glitching)
  */
 
 #include <stdio.h>
@@ -35,11 +34,10 @@ SnapApp catalog[] = {
 int catalog_count = sizeof(catalog) / sizeof(catalog[0]);
 
 void print_banner() {
-    printf("\033[1;35m");
-    printf("╔══════════════════════════════════════════════════════════════════════════════╗\n");
-    printf("║  \033[1;37m🛍️  SNAP STORE :: Canonical Software & Package Center v2.68.4\033[1;35m               ║\n");
-    printf("║  Channel: stable/linux-x86 | Repo: Snapcraft Cloud & MicroOS Core Archive    ║\n");
-    printf("╚══════════════════════════════════════════════════════════════════════════════╝\033[0m\n");
+    printf("\033[1;36m+------------------------------------------------------------------------------+\033[0m\n");
+    printf("\033[1;37m|  [SNAP STORE] :: Canonical Software & Package Center v2.68.4                 |\033[0m\n");
+    printf("|  Channel: stable/linux-x86 | Repo: Snapcraft Cloud & MicroOS Core Archive    |\n");
+    printf("\033[1;36m+------------------------------------------------------------------------------+\033[0m\n");
 }
 
 void print_catalog() {
@@ -60,8 +58,8 @@ void print_catalog() {
     }
     printf("\n\033[1;36m================================================================================\033[0m\n");
     printf("  \033[1;37mCommands:\033[0m\n");
-    printf("    Type \033[1;32m1 - 10\033[0m to install/launch an application\n");
-    printf("    \033[1;33msnap install <name>\033[0m  - Install a package from Snapcraft\n");
+    printf("    Type \033[1;32m1 - 10\033[0m to install or launch an application\n");
+    printf("    \033[1;33msnap install <name>\033[0m  - Install package from Snapcraft\n");
     printf("    \033[1;33msnap list\033[0m            - Show installed snaps\n");
     printf("    \033[1;33msnap find <query>\033[0m    - Search store for packages\n");
     printf("    \033[1;33mexit\033[0m                 - Close Snap Store\n");
@@ -78,12 +76,12 @@ void install_snap(const char *name) {
     }
 
     printf("\n\033[1;33m[*] Connecting to Canonical Snapcraft API for '%s'...\033[0m\n", name);
-    usleep(300000);
-    printf("[+] Fetching assertion & signature from keys.snapcraft.io... Verified.\n");
     usleep(250000);
+    printf("[+] Fetching assertion & signature from keys.snapcraft.io... Verified.\n");
+    usleep(200000);
     printf("[+] Downloading snap '%s' from channel 'latest/stable'...\n", name);
     
-    // Progress bar simulation
+    // Smooth progress bar
     for (int p = 0; p <= 100; p += 10) {
         printf("\r    [");
         for (int b = 0; b < 20; b++) {
@@ -93,22 +91,21 @@ void install_snap(const char *name) {
         }
         printf("] %3d%% (%s) 8.4 MB/s", p, idx >= 0 ? catalog[idx].size : "Ready");
         fflush(stdout);
-        usleep(80000);
+        usleep(60000);
     }
     printf("\n");
-    usleep(200000);
+    usleep(150000);
     printf("[+] Mounting squashfs snap image to /snap/%s/current...\n", name);
-    usleep(200000);
+    usleep(150000);
     printf("[+] Generating desktop wrappers & AppArmor profiles...\n");
-    usleep(200000);
+    usleep(150000);
 
-    // Create real wrapper script in /usr/local/bin if possible
     char cmd[256];
-    snprintf(cmd, sizeof(cmd), "echo '#!/bin/sh\necho \"Starting %s (Snap runtime)...\"\nexec aterm -title \"%s\"' > /usr/local/bin/%s && chmod 755 /usr/local/bin/%s",
-             name, name, name, name);
+    snprintf(cmd, sizeof(cmd), "echo '#!/bin/sh\nexec aterm -title \"%s\"' > /usr/local/bin/%s && chmod 755 /usr/local/bin/%s",
+             name, name, name);
     system(cmd);
 
-    printf("\033[1;32m✔ Snap '%s' successfully installed and ready to launch!\033[0m\n", name);
+    printf("\033[1;32m[SUCCESS] Snap '%s' successfully installed and ready to launch!\033[0m\n", name);
     printf("  Run command: \033[1;37m%s\033[0m\n\n", name);
 
     if (idx >= 0) catalog[idx].installed = true;
@@ -148,7 +145,7 @@ int main(int argc, char *argv[]) {
     // Interactive Mode
     while (1) {
         print_catalog();
-        printf("\033[1;35msnap-store>\033[0m ");
+        printf("\033[1;36msnap-store>\033[0m ");
         char input[128];
         if (!fgets(input, sizeof(input), stdin)) break;
         input[strcspn(input, "\r\n")] = 0;
@@ -182,7 +179,7 @@ int main(int argc, char *argv[]) {
             printf("Press Enter to continue...");
             getchar();
         } else {
-            printf("Unknown command '%s'. Select 1-%d or type 'exit'.\n", input, catalog_count);
+            printf("Unknown option. Select 1-%d or type 'exit'.\n", catalog_count);
             sleep(1);
         }
     }
